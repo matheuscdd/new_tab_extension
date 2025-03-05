@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Tab</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <dialog id="modal-importer">
+        <div class="container">
+            <label>Insert data mapping from extension</label>
+            <fieldset>
+                <legend>Map icon</legend>
+                <textarea class="importer" autocomplete="off"></textarea>
+            </fieldset>
+            <div class="btns">
+                <button class="close">Close</button>
+                <button class="sendImporter">Import</button>
+            </div>
+        </div>
+    </dialog>
+    <dialog id="modal-icon">
+        <div class="container">
+            <label>Load Icon</label>
+            <fieldset>
+                <legend>URL</legend>
+                <textarea class="icon" autocomplete="off"></textarea>
+            </fieldset>
+            <div class="btns">
+                <button class="close">Close</button>
+                <button class="insertIcon">Load</button>
+            </div>
+        </div>
+    </dialog>
+    <dialog id="modal-text">
+        <div class="container">
+            <label>Text Configs</label>
+            <fieldset>
+                <legend>Size - <span data-target="size"></span>px</legend>
+                <input type="range" class="size" data-type="size" max="300" autocomplete="off"/>
+            </fieldset>
+            <fieldset>
+                <legend>Color</legend>
+                <input type="color" class="color" autocomplete="off"/>
+            </fieldset>
+            <div class="btns">
+                <button class="close">Close</button>
+            </div>
+        </div>
+    </dialog>
+    <dialog id="modal-background">
+        <div class="container">
+            <label>Background configs</label>
+            <fieldset>
+                <legend>Image</legend>
+                <textarea class="image" autocomplete="off"></textarea>
+            </fieldset>
+            <fieldset>
+                <legend>Has Fill?</legend>
+                <input type="checkbox" class="hasFill" autocomplete="off"/>
+            </fieldset>
+            <fieldset class="container-image">
+                <legend>Fill</legend>
+                <input type="color" class="fill" autocomplete="off"/>
+            </fieldset>
+            <div class="btns">
+                <button class="close">Close</button>
+            </div>
+        </div>
+    </dialog>
+    <dialog id="modal-grid-system">
+        <div class="container">
+            <label>Define your grid system</label>
+            <fieldset>
+                <legend>Icon Dimensions - <span data-target="dimensions"></span>px</legend>
+                <input type="range" class="dimensions" data-type="dimensions" max="300" autocomplete="off"/>
+            </fieldset>
+            <fieldset>
+                <legend>Row Gap - <span data-target="row"></span>px</legend>
+                <input type="range" class="gap-row" data-type="row" max="300" autocomplete="off"/>
+            </fieldset>
+            <fieldset>
+                <legend>Column Gap - <span data-target="column"></span>px</legend>
+                <input type="range" class="gap-column" data-type="column" max="300" autocomplete="off"/>
+            </fieldset>
+            <div class="btns">
+                <button class="close">Close</button>
+            </div>
+        </div>
+    </dialog>
+    <ul id="bookmarks"></ul>
+    <div class="context-menu d-none">
+        <button class="delBookmark specific">Remove</button>
+        <button class="configIcon specific">Load icon</button>
+        <button class="configBackground">Configure background</button>
+        <button class="configGrid">Configure grid</button>
+        <button class="configText">Configure text</button>
+        <button class="importIcons">Import icons favorites</button>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
