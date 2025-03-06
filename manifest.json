@@ -3,7 +3,11 @@
     "name": "Chrome Bookmarks",
     "version": "1.0",
     "description": "List all bookmarks on new tab.",
-    "permissions": ["bookmarks"],
+    "permissions": ["storage", "background", "bookmarks"],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "host_permissions": ["https://*/*", "http://*/*"],
     "chrome_url_overrides": {
       "newtab": "index.html"
     },
