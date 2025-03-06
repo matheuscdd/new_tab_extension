@@ -1,4 +1,3 @@
-
 const modals = Object.freeze({
     icon: document.querySelector('#modal-icon'),
     text: document.querySelector('#modal-text'),
@@ -35,6 +34,7 @@ const btns = Object.freeze({
 
 const ctxMenu = document.querySelector('.context-menu');
 const bookmarksList = document.querySelector('#bookmarks');
+const placeholder = '/placeholder.png';
 const ctx = {};
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -64,6 +64,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     initEvents();
+    await initDB();
+    const a = 'https://ih1.redbubble.net/image.3021662449.2238/raf,750x1000,075,t,fafafa:ca443f4786.jpg';
+    await getCachedIcon(a);
 });
 
 function initEvents() {
@@ -113,11 +116,11 @@ function initEvents() {
     });
 }
 
-function listBookmarks(bookmarkNodes, icons) {
+async function listBookmarks(bookmarkNodes, icons) {
     const text = JSON.parse(localStorage.getItem('text'));
     const grid = JSON.parse(localStorage.getItem('grid'));
 
-    bookmarkNodes.forEach(bookmark => {
+    for (const bookmark of bookmarkNodes) {
         if (bookmark?.url) {
             const li = document.createElement('li');
             const img = document.createElement('img');
@@ -129,25 +132,25 @@ function listBookmarks(bookmarkNodes, icons) {
             li.dataset.url = bookmark.url;
             
             img.onclick = () => window.location.href = bookmark.url;
-            img.onerror = () => img.src = 'https://i.postimg.cc/Gp7HM7Sp/image.png';
-            img.src = icons[bookmark.url] ?? new URL(bookmark.url).origin + '/favicon.ico'
-            img.style.width = grid.dimensions + "px";
-            img.style.maxWidth = grid.dimensions + "px";
-            img.style.maxHeight = grid.dimensions + "px";
+            img.onerror = () => img.src = placeholder;
+            const icon = icons[bookmark.url] ?? new URL(bookmark.url).origin + '/favicon.ico';
+            img.src = await getCachedIcon(icon);
+            img.style.width = grid.dimensions + 'px';
+            img.style.maxWidth = grid.dimensions + 'px';
+            img.style.maxHeight = grid.dimensions + 'px';
 
             a.href = bookmark.url;
             a.style.color = text.color;
-            a.style.fontSize = text.size + "px";
+            a.style.fontSize = text.size + 'px';
             a.textContent = bookmark.title;
-            a.target = '_blank';
 
             li.append(img, a);
             bookmarksList.appendChild(li);
         }
         if (bookmark?.children) {
-            listBookmarks(bookmark.children, icons);
+            await listBookmarks(bookmark.children, icons);
         }
-    });
+    };
 }
 
 function closeAllModals() {
@@ -169,9 +172,9 @@ function applyGrid() {
     bookmarksList.style.rowGap = grid.row + 'px';
     const icons = Array.from(document.querySelectorAll('.bookmark img'));
     icons.forEach(icon => {
-        icon.style.width = grid.dimensions + "px";
-        icon.style.maxWidth = grid.dimensions + "px";
-        icon.style.maxHeight = grid.dimensions + "px";
+        icon.style.width = grid.dimensions + 'px';
+        icon.style.maxWidth = grid.dimensions + 'px';
+        icon.style.maxHeight = grid.dimensions + 'px';
     });
 }
 
@@ -186,7 +189,7 @@ function applyText() {
     const text = JSON.parse(localStorage.getItem('text'));
     links.forEach(link => {
         link.style.color = text.color;
-        link.style.fontSize = text.size + "px";
+        link.style.fontSize = text.size + 'px';
     });
 }
 
@@ -240,7 +243,7 @@ function showContextMenuCard(e) {
 
 async function delBookmark() {
     chrome.bookmarks.remove(ctx.id);
-    initEvents();
+    document.querySelector(`[data-id="${ctx.id}"]`).remove();
 }
 
 async function insertIcon() {
@@ -289,7 +292,7 @@ function importIcons() {
 
 function loadIcons() {
     const rawestIcons = localStorage.getItem('icons');
-    if (!rawestIcons) return {map: {}, list: []};
+    if (!rawestIcons) return { map: {}, list: [] };
 
     const rawIcons = rawestIcons
         .split('\n')
@@ -301,10 +304,85 @@ function loadIcons() {
         handleIcons[key] = value;
     });
 
-    return {map: handleIcons, list: rawIcons};
+    return { map: handleIcons, list: rawIcons };
 }
 
 function sleep(time) {
     return new Promise((resolve) => setTimeout(resolve, time))
 }
+
+function initDB() {
+    return new Promise(resolve => {
+        const request = indexedDB.open('database', 1);
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('icons')) {
+                const store = db.createObjectStore('icons', { keyPath: 'url' });
+                store.createIndex('urlIndex', 'url', { unique: true });
+            }
+            resolve();
+        }
+        request.onsuccess = (e) => {
+            resolve(e.target.result);
+        }
+    });
+}
+
+function saveCacheIcon(url) {
+    return new Promise(resolve => {
+        const request = indexedDB.open('database');
+        request.onsuccess = (e) => {
+            getImgBase64(url).then(b64 => {
+                const db = e.target.result;
+                const transaction = db.transaction(['icons'], 'readwrite');
+                const store = transaction.objectStore('icons');
+                const addRequest = store.put({ url, b64 }); 
+    
+                addRequest.onsuccess = function() {
+                    resolve(b64);
+                };
+    
+                addRequest.onerror = function() {
+                    console.error(addRequest.error);
+                    resolve(null);
+                };
+            }).catch(console.error);
+        };
+    });
+}
+
+function getCachedIcon(url) {
+    return new Promise(resolve => {
+        const request = indexedDB.open('database');
+        
+        request.onsuccess = (e) => {
+            const db = e.target.result;
+            const transaction = db.transaction(['icons'], 'readonly');
+            const store = transaction.objectStore('icons');
+            
+            const getRequest = store.get(url);
+            getRequest.onsuccess = () => {
+                if (!getRequest.result?.b64) {
+                    saveCacheIcon(url).then((b64) => resolve(b64))
+                } else {
+                    resolve(getRequest.result.b64); 
+                }
+            };
+
+            getRequest.onerror = () => {
+                console.error(getRequest.error);
+                resolve(null);
+            };
+        };
+    });
+}
+
+function getImgBase64(url) {
+    return new Promise(resolve => {
+        chrome.runtime.sendMessage({ action: 'getImg', url }, (response) => 
+            resolve(response?.success ? response.b64 : placeholder)
+        );
+    });
+}
+
   

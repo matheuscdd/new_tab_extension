@@ -1,13 +1,22 @@
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "fetchFavicon") {
-        fetch(request.url)
-            .then(response => response.blob())
-            .then(blob => {
-                const reader = new FileReader();
-                reader.onloadend = () => sendResponse({ data: reader.result });
-                reader.readAsDataURL(blob);
-            })
-            .catch(() => sendResponse({ error: "Failed to fetch" }));
-        return true; // Mantém a conexão assíncrona aberta
-    }
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action !== 'getImg') return;
+  fetch(msg.url)
+    .then(response => response.blob())
+    .then(async bin => {
+      const reader = new FileReader();
+      reader.readAsDataURL(bin);
+      await loadImg(reader);
+      const b64 = reader.result;
+      sendResponse({ success: true, b64});
+  }).catch(error => {
+    console.error(error);
+    sendResponse({ success: false });
+  });
+  return true;
 });
+  
+function loadImg(img) {
+  return new Promise(resolve => {
+      img.onload = () => resolve(img);
+  });
+}
