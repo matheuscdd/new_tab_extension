@@ -135,7 +135,6 @@ async function listBookmarks(bookmarkNodes, icons) {
             img.onerror = () => img.src = placeholder;
             const icon = icons[bookmark.url] ?? new URL(bookmark.url).origin + '/favicon.ico';
             img.src = await getCachedIcon(icon);
-            img.style.width = grid.dimensions + 'px';
             img.style.maxWidth = grid.dimensions + 'px';
             img.style.maxHeight = grid.dimensions + 'px';
 
