@@ -36,6 +36,7 @@ const ctxMenu = document.querySelector('.context-menu');
 const bookmarksList = document.querySelector('#bookmarks');
 const placeholder = '/placeholder.png';
 const ctx = {};
+let sortableBookmarks = null;
 
 document.addEventListener('DOMContentLoaded', async function () {
     document.body.oncontextmenu = showContextMenuBody;
@@ -111,8 +112,94 @@ function initEvents() {
     document.querySelector('[data-target="size"]').innerText = text.size;
 
     const icons = loadIcons().map;
-    chrome.bookmarks.getTree((bookmarkTreeNodes) => {
-        listBookmarks(bookmarkTreeNodes, icons);
+    chrome.bookmarks.getTree(async (bookmarkTreeNodes) => {
+        const allBookmarks = flattenBookmarks(bookmarkTreeNodes);
+        const orderedBookmarks = applyStoredBookmarksOrder(allBookmarks);
+        await listBookmarks(orderedBookmarks, icons);
+        initSortableBookmarks();
+    });
+}
+
+function flattenBookmarks(bookmarkNodes) {
+    const bookmarks = [];
+    for (const bookmark of bookmarkNodes) {
+        if (bookmark?.url) {
+            bookmarks.push(bookmark);
+        }
+        if (bookmark?.children) {
+            bookmarks.push(...flattenBookmarks(bookmark.children));
+        }
+    }
+    return bookmarks;
+}
+
+function getStoredBookmarksOrder() {
+    try {
+        const order = JSON.parse(localStorage.getItem('bookmarksOrder') || '[]');
+        return Array.isArray(order) ? order : [];
+    } catch {
+        return [];
+    }
+}
+
+function applyStoredBookmarksOrder(bookmarks) {
+    const order = getStoredBookmarksOrder();
+    if (!order.length) return bookmarks;
+
+    const orderIndex = new Map(order.map((id, index) => [id, index]));
+    return [...bookmarks].sort((a, b) => {
+        const indexA = orderIndex.has(a.id) ? orderIndex.get(a.id) : Number.MAX_SAFE_INTEGER;
+        const indexB = orderIndex.has(b.id) ? orderIndex.get(b.id) : Number.MAX_SAFE_INTEGER;
+        return indexA - indexB;
+    });
+}
+
+function persistBookmarksOrder() {
+    const order = Array
+        .from(bookmarksList.querySelectorAll('.bookmark'))
+        .map(bookmark => bookmark.dataset.id);
+    localStorage.setItem('bookmarksOrder', JSON.stringify(order));
+}
+
+function moveBookmark(id, parentId, index) {
+    return new Promise(resolve => {
+        chrome.bookmarks.move(id, { parentId, index }, () => resolve());
+    });
+}
+
+async function syncBookmarksOrderInChrome() {
+    const cards = Array.from(bookmarksList.querySelectorAll('.bookmark'));
+    const groupedByParent = cards.reduce((groups, card) => {
+        const parentId = card.dataset.parentId;
+        if (!groups[parentId]) groups[parentId] = [];
+        groups[parentId].push(card.dataset.id);
+        return groups;
+    }, {});
+
+    const parentIds = Object.keys(groupedByParent);
+    for (const parentId of parentIds) {
+        for (const [index, id] of groupedByParent[parentId].entries()) {
+            await moveBookmark(id, parentId, index);
+        }
+    }
+}
+
+function initSortableBookmarks() {
+    if (typeof Sortable === 'undefined') return;
+    if (sortableBookmarks) sortableBookmarks.destroy();
+
+    sortableBookmarks = Sortable.create(bookmarksList, {
+        animation: 180,
+        easing: 'cubic-bezier(0.2, 0, 0.2, 1)',
+        ghostClass: 'bookmark-ghost',
+        chosenClass: 'bookmark-chosen',
+        dragClass: 'bookmark-drag',
+        onStart: () => document.body.classList.add('is-dragging-bookmark'),
+        onEnd: async () => {
+            document.body.classList.remove('is-dragging-bookmark');
+            persistBookmarksOrder();
+            await syncBookmarksOrderInChrome();
+        },
     });
 }
 
@@ -121,34 +208,30 @@ async function listBookmarks(bookmarkNodes, icons) {
     const grid = JSON.parse(localStorage.getItem('grid'));
 
     for (const bookmark of bookmarkNodes) {
-        if (bookmark?.url) {
-            const li = document.createElement('li');
-            const img = document.createElement('img');
-            const a = document.createElement('a');
+        const li = document.createElement('li');
+        const img = document.createElement('img');
+        const a = document.createElement('a');
 
-            li.classList = 'bookmark';
-            li.oncontextmenu = showContextMenuCard;
-            li.dataset.id = bookmark.id;
-            li.dataset.url = bookmark.url;
-            
-            img.onclick = () => window.location.href = bookmark.url;
-            img.onerror = () => img.src = placeholder;
-            const icon = icons[bookmark.url] ?? new URL(bookmark.url).origin + '/favicon.ico';
-            img.src = await getCachedIcon(icon);
-            img.style.height = grid.dimensions + 'px';
+        li.classList = 'bookmark';
+        li.oncontextmenu = showContextMenuCard;
+        li.dataset.id = bookmark.id;
+        li.dataset.parentId = bookmark.parentId;
+        li.dataset.url = bookmark.url;
+        
+        img.onclick = () => window.location.href = bookmark.url;
+        img.onerror = () => img.src = placeholder;
+        const icon = icons[bookmark.url] ?? new URL(bookmark.url).origin + '/favicon.ico';
+        img.src = await getCachedIcon(icon);
+        img.style.height = grid.dimensions + 'px';
 
-            a.href = bookmark.url;
-            a.style.color = text.color;
-            a.style.fontSize = text.size + 'px';
-            a.textContent = bookmark.title;
+        a.href = bookmark.url;
+        a.style.color = text.color;
+        a.style.fontSize = text.size + 'px';
+        a.textContent = bookmark.title;
 
-            li.append(img, a);
-            bookmarksList.appendChild(li);
-        }
-        if (bookmark?.children) {
-            await listBookmarks(bookmark.children, icons);
-        }
-    };
+        li.append(img, a);
+        bookmarksList.appendChild(li);
+    }
 }
 
 function closeAllModals() {

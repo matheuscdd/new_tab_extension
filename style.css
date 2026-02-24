@@ -45,6 +45,29 @@ ul {
     filter: drop-shadow(0px 0px 15px #0000003d);
 }
 
+.bookmark img {
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.bookmark-chosen {
+    opacity: 0.85;
+    transform: scale(1.03);
+}
+
+.bookmark-ghost {
+    opacity: 0.35;
+}
+
+.bookmark-drag {
+    cursor: grabbing;
+    filter: drop-shadow(0px 8px 18px #00000052);
+}
+
+body.is-dragging-bookmark .bookmark {
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
 .bookmark a {
     text-decoration: none;
 }
